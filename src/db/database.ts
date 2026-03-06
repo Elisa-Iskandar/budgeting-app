@@ -21,12 +21,11 @@ const DB_NAME = 'budgeting-app';
 const DB_VERSION = 1;
 
 export const initDB = () => {
-  return openDB(DB_NAME, DB_VERSION, {
+  return openDB<BudgetingDB>(DB_NAME, DB_VERSION, {
     upgrade(db) {
       db.createObjectStore('expenses', { keyPath: 'id', autoIncrement: true });
       db.createObjectStore('budget', { keyPath: 'id' });
       db.createObjectStore('categories', { keyPath: 'name' });
-      db.createObjectStore('streak', { keyPath: 'id' });
     }
   });
 };
@@ -117,7 +116,6 @@ export const deleteAllData = async (): Promise<void> => {
   await db.clear('expenses');
   await db.clear('budget');
   await db.clear('categories');
-  await db.clear('streak');
 };
 
 export const calculateMonthlyTotal = async (year: number, month: number): Promise<number> => {
