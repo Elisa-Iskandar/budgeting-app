@@ -1,28 +1,64 @@
-import { useState } from 'react';
-import { deleteAllData } from '../db/database';
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
+import { useEffect, useState } from 'react';
+import { getBudget, setBudget, deleteAllData } from '@/db/database';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
 
 export default function Settings() {
+  const [value, setValue] = useState<string>('');
+  const [loading, setLoading] = useState<boolean>(true);
+  const [saving, setSaving] = useState<boolean>(false);
+  const [message, setMessage] = useState<string | null>(null);
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
 
+  useEffect(() => {
+    let mounted = true;
+    const load = async () => {
+      try {
+        const b = await getBudget();
+        if (!mounted) return;
+        setValue(b?.monthlyLimit != null ? String(b.monthlyLimit) : '');
+      } catch (err) {
+        console.error('Failed to load budget', err);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    };
+    load();
+    return () => { mounted = false; };
+  }, []);
+
+  const handleSave = async () => {
+    setMessage(null);
+    const parsed = parseFloat(value);
+    if (isNaN(parsed) || parsed < 0) {
+      setMessage('Please enter a valid non-negative number');
+      return;
+    }
+    setSaving(true);
+    try {
+      await setBudget(parsed);
+      setMessage('Monthly budget saved');
+    } catch (err) {
+      console.error('Failed to save budget', err);
+      setMessage('Failed to save budget');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleDeleteAllData = async () => {
     setError('');
     setSuccess(false);
     setIsDeleting(true);
-
     try {
       await deleteAllData();
       setSuccess(true);
       setShowDeleteConfirmation(false);
-      
-      // reset success message after 2 seconds and reload
-      setTimeout(() => {
-        window.location.reload();
-      }, 1500);
+      setTimeout(() => { window.location.reload(); }, 1500);
     } catch (err) {
       setError('Failed to delete data. Please try again.');
       console.error('Delete error:', err);
@@ -31,60 +67,58 @@ export default function Settings() {
     }
   };
 
-  const handleCancelDelete = () => {
-    setShowDeleteConfirmation(false);
-    setError('');
-  };
-
   return (
-    <div className="max-w-2xl mx-auto mt-10 p-10 bg-white">
-      <h2 className="text-center text-2xl font-normal mb-10">Settings</h2>
+    <div className="max-w-lg mx-auto p-4">
+      <h1 className="text-2xl font-semibold mb-4">Settings</h1>
 
-      {/* danger zone */}
+      {/* Monthly budget */}
+      <div className="space-y-2 mb-10">
+        <Label htmlFor="monthly-budget">Monthly budget</Label>
+        <div className="flex gap-2 items-center">
+          <Input
+            id="monthly-budget"
+            type="number"
+            inputMode="decimal"
+            step="0.01"
+            min="0"
+            placeholder="Enter monthly budget"
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            disabled={loading || saving}
+            className="flex-1"
+          />
+          <Button onClick={handleSave} disabled={saving || loading}>
+            {saving ? 'Saving...' : 'Save'}
+          </Button>
+        </div>
+        {message && <div className="text-sm mt-2 text-muted-foreground">{message}</div>}
+      </div>
+
+      {/* Danger zone */}
       <div className="border-2 border-red-500 rounded-lg p-8 bg-red-50">
-        <Label className="text-base font-semibold text-red-600 mb-4 block">
-          ⚠️ Danger Zone
-        </Label>
-
+        <Label className="text-base font-semibold text-red-600 mb-4 block">⚠️ Danger Zone</Label>
         {!showDeleteConfirmation ? (
           <div className="mb-4">
             <p className="text-sm text-gray-600 mb-6">
               Delete all your data including expenses, budgets, and categories. This action cannot be undone.
             </p>
-            <Button 
-              onClick={() => setShowDeleteConfirmation(true)}
-              className="bg-red-600 hover:bg-red-700 text-white"
-            >
+            <Button onClick={() => setShowDeleteConfirmation(true)} className="bg-red-600 hover:bg-red-700 text-white">
               Delete All Data
             </Button>
           </div>
         ) : (
           <div className="bg-white rounded-lg p-6 border border-red-300">
-            <h3 className="font-semibold text-red-600 mb-3">
-              Are you sure you want to delete all data?
-            </h3>
+            <h3 className="font-semibold text-red-600 mb-3">Are you sure you want to delete all data?</h3>
             <p className="text-sm text-gray-600 mb-6">
               This action is permanent and cannot be reversed. All your expenses, budgets, and categories will be deleted.
             </p>
-
-            {/* error / success */}
             {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
             {success && <p className="text-green-500 text-sm mb-4">✓ Data deleted successfully. Reloading...</p>}
-
-            {/* confirmation buttons */}
             <div className="flex items-center gap-4">
-              <Button 
-                onClick={handleDeleteAllData}
-                disabled={isDeleting}
-                className="bg-red-600 hover:bg-red-700 text-white"
-              >
+              <Button onClick={handleDeleteAllData} disabled={isDeleting} className="bg-red-600 hover:bg-red-700 text-white">
                 {isDeleting ? 'Deleting...' : 'Yes, Delete Everything'}
               </Button>
-              <Button 
-                onClick={handleCancelDelete}
-                disabled={isDeleting}
-                className="bg-gray-400 hover:bg-gray-500 text-white"
-              >
+              <Button onClick={() => { setShowDeleteConfirmation(false); setError(''); }} disabled={isDeleting} className="bg-gray-400 hover:bg-gray-500 text-white">
                 Cancel
               </Button>
             </div>
