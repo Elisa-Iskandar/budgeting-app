@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import type { Category } from '../types';
-import { addExpense, getAllCategories, seedDefaultCategories } from '../db/database';
+import { addExpense, getAllCategories, seedDefaultCategories, checkBudgetAlert } from '../db/database';
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -52,6 +52,7 @@ export default function AddExpense() {
       date,
       note: note.trim() || undefined,
     });
+    await checkBudgetAlert();
 
     setAmount('');
     setCategory('');

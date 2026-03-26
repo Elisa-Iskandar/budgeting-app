@@ -1,6 +1,6 @@
 import { openDB } from 'idb';
 import type { DBSchema } from 'idb';
-import type { Expense, Budget, Category } from '../types';
+import type { Expense, Budget, Category, Streak } from '../types';
 
 interface BudgetingDB extends DBSchema {
   expenses: {
@@ -15,17 +15,30 @@ interface BudgetingDB extends DBSchema {
     key: string;
     value: Category;
   };
+  streak: {
+    key: number;
+    value: Streak;
+  };
 }
 
 const DB_NAME = 'budgeting-app';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 export const initDB = () => {
   return openDB<BudgetingDB>(DB_NAME, DB_VERSION, {
     upgrade(db) {
-      db.createObjectStore('expenses', { keyPath: 'id', autoIncrement: true });
-      db.createObjectStore('budget', { keyPath: 'id' });
-      db.createObjectStore('categories', { keyPath: 'name' });
+      if (!db.objectStoreNames.contains('expenses')) {
+        db.createObjectStore('expenses', { keyPath: 'id', autoIncrement: true });
+      }
+      if (!db.objectStoreNames.contains('budget')) {
+        db.createObjectStore('budget', { keyPath: 'id' });
+      }
+      if (!db.objectStoreNames.contains('categories')) {
+        db.createObjectStore('categories', { keyPath: 'name' });
+      }
+      if (!db.objectStoreNames.contains('streak')) {
+        db.createObjectStore('streak', { keyPath: 'id' });
+      }
     }
   });
 };
@@ -109,13 +122,63 @@ export const seedDefaultCategories = async (): Promise<void> => {
   }
 };
 
-//utility
+// streak functions
+
+export const getStreak = async (): Promise<Streak | undefined> => {
+  const db = await initDB();
+  return db.get('streak', 1);
+};
+
+export const updateStreak = async (): Promise<void> => {
+  const db = await initDB();
+  const allExpenses = await getAllExpenses();
+  const uniqueDates = [...new Set(allExpenses.map(e => e.date))].sort();
+
+  if (uniqueDates.length === 0) return;
+
+  let streak = 1;
+  for (let i = 1; i < uniqueDates.length; i++) {
+    const prev = new Date(uniqueDates[i - 1] + 'T00:00:00');
+    const curr = new Date(uniqueDates[i] + 'T00:00:00');
+    const diffDays = Math.round((curr.getTime() - prev.getTime()) / (1000 * 60 * 60 * 24));
+    if (diffDays === 1) {
+      streak++;
+    } else if (diffDays > 1) {
+      streak = 1;
+    }
+  }
+
+  const lastDate = uniqueDates[uniqueDates.length - 1];
+  await db.put('streak', { id: 1, currentStreak: streak, lastLoggedDate: lastDate });
+};
+
+// utility functions
 
 export const deleteAllData = async (): Promise<void> => {
   const db = await initDB();
   await db.clear('expenses');
   await db.clear('budget');
   await db.clear('categories');
+  await db.clear('streak');
+};
+
+export const checkBudgetAlert = async (): Promise<void> => {
+  const budget = await getBudget();
+  if (!budget || budget.monthlyLimit === 0) return;
+
+  const notificationsEnabled = localStorage.getItem('notificationsEnabled') === 'true';
+  if (!notificationsEnabled) return;
+
+  const threshold = Number(localStorage.getItem('alertThreshold') ?? 75);
+  const now = new Date();
+  const total = await calculateMonthlyTotal(now.getFullYear(), now.getMonth() + 1);
+  const percent = Math.round((total / budget.monthlyLimit) * 100);
+
+  if (percent >= threshold && Notification.permission === 'granted') {
+    new Notification('Budget Alert', {
+      body: `You have used ${percent}% of your monthly budget.`,
+    });
+  }
 };
 
 export const calculateMonthlyTotal = async (year: number, month: number): Promise<number> => {

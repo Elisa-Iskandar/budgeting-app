@@ -15,6 +15,7 @@ export default function History() {
   const [editCategory, setEditCategory] = useState('');
   const [editDate, setEditDate] = useState('');
   const [editNote, setEditNote] = useState('');
+  const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
 
   const load = async () => {
     const all = await getAllExpenses();
@@ -53,6 +54,7 @@ export default function History() {
 
   const handleDelete = async (id: number) => {
     await deleteExpense(id);
+    setDeleteConfirmId(null);
     load();
   };
 
@@ -135,13 +137,25 @@ export default function History() {
                 {/* Amount */}
                 <p className="text-sm font-semibold">£{expense.amount.toFixed(2)}</p>
 
-                {/* Delete button */}
-                <button
-                  onClick={() => handleDelete(expense.id!)}
-                  className="text-gray-400 hover:text-red-500 transition-colors shrink-0"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
+                {/* Delete button / confirm */}
+                {deleteConfirmId === expense.id ? (
+                  <div className="flex items-center gap-2 rounded-lg border border-red-300 bg-red-50 px-3 py-1.5">
+                    <span className="text-xs text-red-600 font-medium">Delete?</span>
+                    <Button size="sm" onClick={() => handleDelete(expense.id!)} className="bg-red-600 hover:bg-red-700 text-white h-6 px-2 text-xs">
+                      Yes
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => setDeleteConfirmId(null)} className="h-6 px-2 text-xs">
+                      No
+                    </Button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setDeleteConfirmId(expense.id!)}
+                    className="text-gray-400 hover:text-red-500 transition-colors shrink-0"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )}
               </div>
             )}
 
