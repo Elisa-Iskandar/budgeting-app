@@ -13,6 +13,12 @@ export interface Budget {
 
 export interface Category {
   name: string;
-  categoryBudget?: number; 
+  categoryBudget?: number;
+}
+
+export interface Streak {
+  id: 1;
+  currentStreak: number;
+  lastLoggedDate: string;
 }
 
